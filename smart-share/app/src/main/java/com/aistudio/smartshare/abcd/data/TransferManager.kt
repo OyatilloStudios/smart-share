@@ -68,14 +68,14 @@ object CryptoHelper {
 
     fun getEncryptCipher(password: String, iv: ByteArray): Cipher {
         val key = deriveKey(password)
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        val cipher = Cipher.getInstance("AES/CTR/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key, IvParameterSpec(iv))
         return cipher
     }
 
     fun getDecryptCipher(password: String, iv: ByteArray): Cipher {
         val key = deriveKey(password)
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        val cipher = Cipher.getInstance("AES/CTR/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key, IvParameterSpec(iv))
         return cipher
     }
