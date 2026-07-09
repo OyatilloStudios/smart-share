@@ -22,16 +22,22 @@ jobs:
     - name: 3. Flutter SDK o'rnatish
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.22.0' # Yoki o'zingiz ishlatayotgan versiya
+        flutter-version: '3.22.0'
         channel: 'stable'
         cache: true
 
-    - name: 4. Paketlarni yuklab olish (Dependencies)
-      run: flutter pub get
+    - name: 4. Loyiha papkasini aniqlash va Paketlarni yuklash
+      run: |
+        # pubspec.yaml fayli qaysi papkada turganini aniqlaymiz
+        TARGET_DIR=$(dirname $(find . -name "pubspec.yaml" -type f | head -n 1))
+        echo "Loyiha papkasi topildi: $TARGET_DIR"
+        cd $TARGET_DIR
+        flutter pub get
 
     - name: 5. Debug.keystore faylini tayyorlash
       run: |
-        cd android
+        TARGET_DIR=$(dirname $(find . -name "pubspec.yaml" -type f | head -n 1))
+        cd $TARGET_DIR/android
         keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
         echo "storeFile=debug.keystore" > local.properties
         echo "storePassword=android" >> local.properties
@@ -39,10 +45,13 @@ jobs:
         echo "keyAlias=androiddebugkey" >> local.properties
 
     - name: 6. APK yig'ish (Flutter build)
-      run: flutter build apk --debug
+      run: |
+        TARGET_DIR=$(dirname $(find . -name "pubspec.yaml" -type f | head -n 1))
+        cd $TARGET_DIR
+        flutter build apk --debug
 
     - name: 7. Tayyor APK faylni yuklab olish uchun taqdim etish
       uses: actions/upload-artifact@v4
       with:
         name: Smart-Share-Debug-APK
-        path: build/app/outputs/flutter-apk/app-debug.apk
+        path: "**/build/app/outputs/flutter-apk/app-debug.apk"
