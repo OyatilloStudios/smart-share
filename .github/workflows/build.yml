@@ -28,16 +28,28 @@ jobs:
 
     - name: 4. Loyiha papkasini aniqlash va Paketlarni yuklash
       run: |
-        # pubspec.yaml fayli qaysi papkada turganini aniqlaymiz
-        TARGET_DIR=$(dirname $(find . -name "pubspec.yaml" -type f | head -n 1))
+        echo "pubspec.yaml fayli qidirilmoqda..."
+        PUBSPEC_PATH=$(find . -name "pubspec.yaml" -type f | head -n 1)
+        
+        if [ -z "$PUBSPEC_PATH" ]; then
+          echo "⚠️ XATOLIK: GitHub'dagi ushbu branch ichida 'pubspec.yaml' fayli topilmadi!"
+          echo "Hozirgi repozitoriyadagi bor fayllar ro'yxati quyidagicha:"
+          ls -R
+          exit 1
+        fi
+        
+        TARGET_DIR=$(dirname "$PUBSPEC_PATH")
         echo "Loyiha papkasi topildi: $TARGET_DIR"
+        
+        # Keyingi qadamlar ham foydalanishi uchun atrof-muhit o'zgaruvchisiga saqlaymiz
+        echo "TARGET_DIR=$TARGET_DIR" >> $GITHUB_ENV
+        
         cd $TARGET_DIR
         flutter pub get
 
     - name: 5. Debug.keystore faylini tayyorlash
       run: |
-        TARGET_DIR=$(dirname $(find . -name "pubspec.yaml" -type f | head -n 1))
-        cd $TARGET_DIR/android
+        cd ${{ env.TARGET_DIR }}/android
         keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
         echo "storeFile=debug.keystore" > local.properties
         echo "storePassword=android" >> local.properties
@@ -46,8 +58,7 @@ jobs:
 
     - name: 6. APK yig'ish (Flutter build)
       run: |
-        TARGET_DIR=$(dirname $(find . -name "pubspec.yaml" -type f | head -n 1))
-        cd $TARGET_DIR
+        cd ${{ env.TARGET_DIR }}
         flutter build apk --debug
 
     - name: 7. Tayyor APK faylni yuklab olish uchun taqdim etish
