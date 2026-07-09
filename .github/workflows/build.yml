@@ -1,0 +1,48 @@
+name: Smart Share APK Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 1. Kodni yuklab olish
+      uses: actions/checkout@v4
+
+    - name: 2. Java 17 o'rnatish
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: 3. Flutter SDK o'rnatish
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.22.0' # Yoki o'zingiz ishlatayotgan versiya
+        channel: 'stable'
+        cache: true
+
+    - name: 4. Paketlarni yuklab olish (Dependencies)
+      run: flutter pub get
+
+    - name: 5. Debug.keystore faylini tayyorlash
+      run: |
+        cd android
+        keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        echo "storeFile=debug.keystore" > local.properties
+        echo "storePassword=android" >> local.properties
+        echo "keyPassword=android" >> local.properties
+        echo "keyAlias=androiddebugkey" >> local.properties
+
+    - name: 6. APK yig'ish (Flutter build)
+      run: flutter build apk --debug
+
+    - name: 7. Tayyor APK faylni yuklab olish uchun taqdim etish
+      uses: actions/upload-artifact@v4
+      with:
+        name: Smart-Share-Debug-APK
+        path: build/app/outputs/flutter-apk/app-debug.apk
