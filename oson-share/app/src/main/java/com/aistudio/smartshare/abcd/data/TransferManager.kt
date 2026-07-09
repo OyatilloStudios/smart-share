@@ -214,6 +214,7 @@ class TransferManager(private val context: Context, private val historyManager: 
             val filename = meta.getString("name")
             val totalSize = meta.getLong("size")
             val isEncrypted = meta.optBoolean("encrypted", false)
+            val senderCode = meta.optString("senderCode", "")
 
             _status.value = TransferStatus.CONNECTING
             _activeFile.value = filename
@@ -257,7 +258,8 @@ class TransferManager(private val context: Context, private val historyManager: 
                     if (r == -1) throw Exception("Connection closed while reading IV")
                     ivRead += r
                 }
-                val pwd = userPassword.ifEmpty { encryptionPassword.ifEmpty { getDeviceCode() } }
+                // Use user-entered password, or sender's code as fallback
+                val pwd = userPassword.ifEmpty { encryptionPassword.ifEmpty { senderCode.ifEmpty { getDeviceCode() } } }
                 cipher = CryptoHelper.getDecryptCipher(pwd, iv)
             }
 
@@ -305,7 +307,7 @@ class TransferManager(private val context: Context, private val historyManager: 
                 }
             }
 
-            if (received >= totalSize - 64) {
+            if (received >= totalSize) {
                 saveReceivedFile(tempFile, filename, tempFile.length())
                 _status.value = TransferStatus.COMPLETED
             } else {
@@ -436,14 +438,15 @@ class TransferManager(private val context: Context, private val historyManager: 
                     out.flush()
                 }
 
-                val useEncryption = true
-                val pwd = encryptionPassword.ifEmpty { code }
+                val useEncryption = encryptionPassword.isNotEmpty()
+                val pwd = encryptionPassword
 
                 val metaJson = JSONObject().apply {
                     put("type", "meta")
                     put("name", file.name)
                     put("size", file.size)
                     put("encrypted", useEncryption)
+                    put("senderCode", getDeviceCode())
                 }
                 out.write(metaJson.toString().toByteArray(Charsets.UTF_8))
                 out.flush()

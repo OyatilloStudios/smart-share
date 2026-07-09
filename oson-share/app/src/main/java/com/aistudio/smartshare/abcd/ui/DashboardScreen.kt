@@ -142,6 +142,16 @@ fun DashboardScreen(
                                         val rawValue = barcode.rawValue ?: ""
                                         try {
                                             val json = org.json.JSONObject(rawValue)
+                                            // Extract IP for direct connection (faster)
+                                            val ipsArray = json.optJSONArray("ips")
+                                            if (ipsArray != null && ipsArray.length() > 0) {
+                                                val ip = ipsArray.optString(0, "")
+                                                if (ip.isNotEmpty()) {
+                                                    viewModel.setTargetCode(ip)
+                                                    return@addOnSuccessListener
+                                                }
+                                            }
+                                            // Fallback to code
                                             val code = json.optString("code")
                                             if (code.isNotEmpty()) {
                                                 viewModel.setTargetCode(code)
@@ -149,6 +159,12 @@ fun DashboardScreen(
                                         } catch (e: Exception) {
                                             viewModel.setTargetCode(rawValue)
                                         }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        e.printStackTrace()
+                                    }
+                                    .addOnCanceledListener {
+                                        // User cancelled scan — do nothing
                                     }
                             } catch (e: Exception) {
                                 e.printStackTrace()
