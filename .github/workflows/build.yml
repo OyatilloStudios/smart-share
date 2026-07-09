@@ -19,50 +19,31 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: 3. Flutter SDK o'rnatish
-      uses: subosito/flutter-action@v2
+    - name: 3. Gradle dvigatelini sozlash
+      uses: gradle/actions/setup-gradle@v4
       with:
-        flutter-version: '3.22.0'
-        channel: 'stable'
-        cache: true
+        gradle-version: '8.10' # Repozitoriyada wrapper yo'qligi uchun avtomatik o'rnatiladi
 
-    - name: 4. Loyiha papkasini aniqlash va Paketlarni yuklash
+    - name: 4. Loyiha muhitini tayyorlash
       run: |
-        echo "pubspec.yaml fayli qidirilmoqda..."
-        PUBSPEC_PATH=$(find . -name "pubspec.yaml" -type f | head -n 1)
-        
-        if [ -z "$PUBSPEC_PATH" ]; then
-          echo "⚠️ XATOLIK: GitHub'dagi ushbu branch ichida 'pubspec.yaml' fayli topilmadi!"
-          echo "Hozirgi repozitoriyadagi bor fayllar ro'yxati quyidagicha:"
-          ls -R
-          exit 1
-        fi
-        
-        TARGET_DIR=$(dirname "$PUBSPEC_PATH")
-        echo "Loyiha papkasi topildi: $TARGET_DIR"
-        
-        # Keyingi qadamlar ham foydalanishi uchun atrof-muhit o'zgaruvchisiga saqlaymiz
+        # settings.gradle.kts qayerdaligini aniqlab olamiz (oson-share papkasi)
+        TARGET_DIR=$(dirname $(find . -name "settings.gradle.kts" -type f | head -n 1))
+        echo "Loyiha papkasi: $TARGET_DIR"
         echo "TARGET_DIR=$TARGET_DIR" >> $GITHUB_ENV
         
         cd $TARGET_DIR
-        flutter pub get
-
-    - name: 5. Debug.keystore faylini tayyorlash
-      run: |
-        cd ${{ env.TARGET_DIR }}/android
+        echo "sdk.dir=$ANDROID_HOME" > local.properties
+        
+        # Yetishmayotgan debug.keystore faylini avtomatik yaratamiz
         keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-        echo "storeFile=debug.keystore" > local.properties
-        echo "storePassword=android" >> local.properties
-        echo "keyPassword=android" >> local.properties
-        echo "keyAlias=androiddebugkey" >> local.properties
 
-    - name: 6. APK yig'ish (Flutter build)
+    - name: 5. Dasturni yig'ish (Build APK)
       run: |
         cd ${{ env.TARGET_DIR }}
-        flutter build apk --debug
+        gradle assembleDebug -x test --no-daemon
 
-    - name: 7. Tayyor APK faylni yuklab olish uchun taqdim etish
+    - name: 6. Tayyor APK faylni yuklab olish uchun taqdim etish
       uses: actions/upload-artifact@v4
       with:
-        name: Smart-Share-Debug-APK
-        path: "**/build/app/outputs/flutter-apk/app-debug.apk"
+        name: Smart-Share-Native-APK
+        path: "**/app/build/outputs/apk/debug/*.apk"
