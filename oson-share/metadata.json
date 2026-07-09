@@ -1,0 +1,6 @@
+{
+  "name": "SmartShare",
+  "description": "A Premium Cross-Platform P2P Local and Remote File Sharing Application.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
