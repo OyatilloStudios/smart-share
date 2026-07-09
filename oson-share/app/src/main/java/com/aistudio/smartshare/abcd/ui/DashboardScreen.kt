@@ -25,6 +25,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aistudio.smartshare.abcd.MainViewModel
 import com.aistudio.smartshare.abcd.utils.QrGenerator
 
+// Google Code Scanner kutubxonalari importlari
+import com.google.android.gms.code.scanner.GmsBarcodeScanning
+import com.google.android.gms.code.scanner.GmsBarcode
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
@@ -132,9 +136,9 @@ fun DashboardScreen(
                     trailingIcon = {
                         IconButton(onClick = {
                             try {
-                                val scanner = com.google.android.gms.code.scanner.GmsBarcodeScanning.getClient(context)
+                                val scanner = GmsBarcodeScanning.getClient(context)
                                 scanner.startScan()
-                                    .addOnSuccessListener { barcode ->
+                                    .addOnSuccessListener { barcode: GmsBarcode ->
                                         val rawValue = barcode.rawValue ?: ""
                                         try {
                                             val json = org.json.JSONObject(rawValue)
