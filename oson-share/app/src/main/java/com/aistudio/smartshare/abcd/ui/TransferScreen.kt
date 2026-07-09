@@ -49,6 +49,7 @@ fun TransferScreen(
         ) {
 
             if (incomingRequest != null) {
+                var incomingPassword by remember { mutableStateOf("") }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
@@ -60,9 +61,23 @@ fun TransferScreen(
                         Text("Incoming Request", style = MaterialTheme.typography.titleLarge)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "File: ${incomingRequest!!.filename}\nSize: ${incomingRequest!!.size / 1024 / 1024} MB",
+                            "File: ${incomingRequest!!.filename}\nSize: ${incomingRequest!!.size / 1024 / 1024} MB\nFrom: ${incomingRequest!!.peerIp}",
                             textAlign = TextAlign.Center
                         )
+
+                        if (incomingRequest!!.isEncrypted) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("This file is encrypted. Enter password:", style = MaterialTheme.typography.bodySmall)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = incomingPassword,
+                                onValueChange = { incomingPassword = it },
+                                placeholder = { Text("Password") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
                         Spacer(modifier = Modifier.height(24.dp))
                         Row(
                             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -71,7 +86,7 @@ fun TransferScreen(
                             Button(onClick = { viewModel.acceptIncoming(false) }) {
                                 Text("Reject")
                             }
-                            Button(onClick = { viewModel.acceptIncoming(true) }) {
+                            Button(onClick = { viewModel.acceptIncoming(true, incomingPassword) }) {
                                 Text("Accept")
                             }
                         }

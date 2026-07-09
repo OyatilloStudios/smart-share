@@ -78,9 +78,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun acceptIncoming(accept: Boolean) {
+    fun setEncryptionPassword(password: String) {
+        transferManager.encryptionPassword = password
+    }
+
+    fun getEncryptionPassword(): String {
+        return transferManager.encryptionPassword
+    }
+
+    fun getLocalIpsList(): List<String> {
+        return transferManager.getLocalIpsList()
+    }
+
+    fun acceptIncoming(accept: Boolean, password: String = "") {
         val request = transferManager.incomingRequest.value
-        request?.onResponse?.invoke(accept)
+        request?.onResponse?.invoke(accept, password)
     }
 
     fun cancelTransfer() {

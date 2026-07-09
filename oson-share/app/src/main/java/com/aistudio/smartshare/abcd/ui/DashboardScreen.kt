@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -100,19 +101,75 @@ fun DashboardScreen(
                                 .padding(8.dp)
                         )
                     }
+
+                    val localIps = remember { viewModel.getLocalIpsList() }
+                    if (localIps.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("My IP Addresses:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        localIps.forEach { ip ->
+                            Text(ip, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Send Section
-            OutlinedTextField(
-                value = targetCode,
-                onValueChange = { viewModel.setTargetCode(it) },
-                label = { Text("Enter Target Code") },
+            val context = androidx.compose.ui.platform.LocalContext.current
+
+            // Send Section (Target Code and Password)
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = targetCode,
+                    onValueChange = { viewModel.setTargetCode(it) },
+                    label = { Text("Target Code / IP", fontSize = 11.sp) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            try {
+                                val scanner = com.google.android.gms.code.scanner.GmsBarcodeScanning.getClient(context)
+                                scanner.startScan()
+                                    .addOnSuccessListener { barcode ->
+                                        val rawValue = barcode.rawValue ?: ""
+                                        try {
+                                            val json = org.json.JSONObject(rawValue)
+                                            val code = json.optString("code")
+                                            if (code.isNotEmpty()) {
+                                                viewModel.setTargetCode(code)
+                                            }
+                                        } catch (e: Exception) {
+                                            viewModel.setTargetCode(rawValue)
+                                        }
+                                    }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Scan QR Code"
+                            )
+                        }
+                    }
+                )
+
+                var passwordInput by remember { mutableStateOf(viewModel.getEncryptionPassword()) }
+                OutlinedTextField(
+                    value = passwordInput,
+                    onValueChange = { 
+                        passwordInput = it
+                        viewModel.setEncryptionPassword(it)
+                    },
+                    label = { Text("Password (optional)", fontSize = 11.sp) },
+                    modifier = Modifier.weight(1.2f),
+                    singleLine = true
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 

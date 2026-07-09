@@ -50,7 +50,8 @@ data class IncomingRequest(
     val filename: String,
     val size: Long,
     val peerIp: String,
-    val onResponse: (Boolean) -> Unit
+    val isEncrypted: Boolean,
+    val onResponse: (Boolean, String) -> Unit
 )
 
 object CryptoHelper {
@@ -218,9 +219,11 @@ class TransferManager(private val context: Context, private val historyManager: 
             _activeFile.value = filename
 
             var allowed = false
+            var userPassword = ""
             val latch = CountDownLatch(1)
-            _incomingRequest.value = IncomingRequest(filename, totalSize, peerIp) { accept ->
+            _incomingRequest.value = IncomingRequest(filename, totalSize, peerIp, isEncrypted) { accept, pwd ->
                 allowed = accept
+                userPassword = pwd
                 latch.countDown()
             }
             latch.await()
@@ -254,7 +257,7 @@ class TransferManager(private val context: Context, private val historyManager: 
                     if (r == -1) throw Exception("Connection closed while reading IV")
                     ivRead += r
                 }
-                val pwd = encryptionPassword.ifEmpty { getDeviceCode() }
+                val pwd = userPassword.ifEmpty { encryptionPassword.ifEmpty { getDeviceCode() } }
                 cipher = CryptoHelper.getDecryptCipher(pwd, iv)
             }
 
@@ -628,6 +631,24 @@ class TransferManager(private val context: Context, private val historyManager: 
             ex.printStackTrace()
         }
         return null
+    }
+
+    fun getLocalIpsList(): List<String> {
+        val ips = mutableListOf<String>()
+        try {
+            val interfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
+            for (networkInterface in interfaces) {
+                val addresses = Collections.list(networkInterface.inetAddresses)
+                for (address in addresses) {
+                    if (!address.isLoopbackAddress && address is Inet4Address) {
+                        ips.add(address.hostAddress)
+                    }
+                }
+            }
+        } catch (ex: Exception) {
+            ex.printStackTrace()
+        }
+        return ips
     }
 
     fun onDestroy() {
