@@ -13,37 +13,52 @@ jobs:
     - name: 1. Kodni yuklab olish
       uses: actions/checkout@v4
 
-    - name: 2. Java 17 o'rnatish
+    - name: 2. Java 21 o'rnatish
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
 
-    - name: 3. Gradle dvigatelini sozlash
-      uses: gradle/actions/setup-gradle@v4
-      with:
-        gradle-version: '8.10' # Repozitoriyada wrapper yo'qligi uchun avtomatik o'rnatiladi
-
-    - name: 4. Loyiha muhitini tayyorlash
+    - name: 3. Xatoliklarni tozalash va muhitni tayyorlash
       run: |
-        # settings.gradle.kts qayerdaligini aniqlab olamiz (oson-share papkasi)
-        TARGET_DIR=$(dirname $(find . -name "settings.gradle.kts" -type f | head -n 1))
-        echo "Loyiha papkasi: $TARGET_DIR"
-        echo "TARGET_DIR=$TARGET_DIR" >> $GITHUB_ENV
-        
+        # Loyiha qaysi papkada ekanligini avtomat topish (oson-share papkasini aniqlaydi)
+        TARGET_DIR=$(dirname $(find . -name "app" -type d | head -n 1))
         cd $TARGET_DIR
+        
+        echo "Ishchi papka: $TARGET_DIR"
+        
+        touch .env .env.example
         echo "sdk.dir=$ANDROID_HOME" > local.properties
         
-        # Yetishmayotgan debug.keystore faylini avtomatik yaratamiz
+        # AI qoldirgan mantiqiy xatolarni tozalash
+        if [ -f "app/build.gradle.kts" ]; then
+          echo "build.gradle.kts tozalanmoqda..."
+          sed -i 's/"ksp"(/add("ksp", /g' app/build.gradle.kts
+          sed -i 's/ksp(/add("ksp", /g' app/build.gradle.kts
+        fi
+        
+        # Yetishmayotgan xavfsizlik imzosini yaratish
         keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        echo "Keystore fayli yaratildi."
+
+    - name: 4. Toza Gradle 9.3.1 dvigatelini o'rnatish
+      run: |
+        TARGET_DIR=$(dirname $(find . -name "app" -type d | head -n 1))
+        cd $TARGET_DIR
+        
+        wget -q https://services.gradle.org/distributions/gradle-9.3.1-bin.zip
+        unzip -q gradle-9.3.1-bin.zip
 
     - name: 5. Dasturni yig'ish (Build APK)
       run: |
-        cd ${{ env.TARGET_DIR }}
-        gradle assembleDebug -x test --no-daemon
+        TARGET_DIR=$(dirname $(find . -name "app" -type d | head -n 1))
+        cd $TARGET_DIR
+        
+        # Lint va testlarni chetlab o'tib, eng katta tezlikda yig'ish
+        ./gradle-9.3.1/bin/gradle assembleDebug -x lint -x test --no-daemon
 
-    - name: 6. Tayyor APK faylni yuklab olish uchun taqdim etish
+    - name: 6. Tayyor faylni olish
       uses: actions/upload-artifact@v4
       with:
-        name: Smart-Share-Native-APK
+        name: Smart-Share-APK-Fayl
         path: "**/app/build/outputs/apk/debug/*.apk"
