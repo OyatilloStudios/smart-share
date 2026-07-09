@@ -122,6 +122,9 @@ class TransferManager(private val context: Context, private val historyManager: 
         scope.launch(Dispatchers.IO) {
             runUdpServer()
         }
+        scope.launch(Dispatchers.IO) {
+            runRelayReceiver()
+        }
     }
 
     private fun registerOnSignalingBackground() {
@@ -195,12 +198,51 @@ class TransferManager(private val context: Context, private val historyManager: 
         }
     }
 
-    private suspend fun handleClientConnection(socket: Socket) {
+    private suspend fun runRelayReceiver() = withContext(Dispatchers.IO) {
+        val relayHost = "oson-share-signaling.glitch.me"
+        val myCode = getDeviceCode()
+        
+        while (true) {
+            var socket: Socket? = null
+            try {
+                socket = Socket()
+                socket.connect(java.net.InetSocketAddress(relayHost, 8991), 15000)
+                socket.soTimeout = 0 // Infinite timeout to wait for sender
+                
+                val out = socket.getOutputStream()
+                val registerHeader = JSONObject().apply {
+                    put("mode", "receive")
+                    put("code", myCode)
+                }
+                out.write((registerHeader.toString() + "\n").toByteArray(Charsets.UTF_8))
+                out.flush()
+                
+                val pushbackStream = java.io.PushbackInputStream(socket.getInputStream())
+                val firstByte = pushbackStream.read()
+                if (firstByte == -1) {
+                    socket.close()
+                    kotlinx.coroutines.delay(5000)
+                    continue
+                }
+                pushbackStream.unread(firstByte)
+                
+                val finalSocket = socket
+                scope.launch(Dispatchers.IO) {
+                    handleClientConnection(finalSocket, pushbackStream)
+                }
+            } catch (e: Exception) {
+                try { socket?.close() } catch (ex: Exception) {}
+                kotlinx.coroutines.delay(5000)
+            }
+        }
+    }
+
+    private suspend fun handleClientConnection(socket: Socket, customInputStream: InputStream? = null) {
         val peerIp = socket.inetAddress.hostAddress ?: "unknown"
         var tempFile: java.io.File? = null
         try {
             socket.soTimeout = 30000
-            val inputStream = socket.getInputStream()
+            val inputStream = customInputStream ?: socket.getInputStream()
             val outputStream = socket.getOutputStream()
 
             val buffer = ByteArray(1024)
@@ -418,11 +460,22 @@ class TransferManager(private val context: Context, private val historyManager: 
                 _activeFile.value = file.name
 
                 socket = Socket()
-                if (isRelay) {
+                var connected = false
+                if (!isRelay && targetIp != null) {
+                    try {
+                        socket.connect(java.net.InetSocketAddress(targetIp, 8989), 4000)
+                        connected = true
+                    } catch (e: Exception) {
+                        // Fallback to relay
+                        try { socket.close() } catch (ex: Exception) {}
+                        socket = Socket()
+                    }
+                }
+
+                if (!connected) {
+                    isRelay = true
                     val relayHost = "oson-share-signaling.glitch.me"
                     socket.connect(java.net.InetSocketAddress(relayHost, 8991), 15000)
-                } else {
-                    socket.connect(java.net.InetSocketAddress(targetIp, 8989), 10000)
                 }
                 socket.soTimeout = 30000
 
