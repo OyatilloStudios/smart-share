@@ -111,6 +111,7 @@ class TransferManager(private val context: Context, private val historyManager: 
     var encryptionPassword = ""
 
     init {
+        createNotificationChannel()
         startServer()
         registerOnSignalingBackground()
     }
@@ -261,6 +262,8 @@ class TransferManager(private val context: Context, private val historyManager: 
             _status.value = TransferStatus.CONNECTING
             _activeFile.value = filename
 
+            showIncomingNotification(filename, peerIp)
+
             var allowed = false
             var userPassword = ""
             val latch = CountDownLatch(1)
@@ -271,6 +274,10 @@ class TransferManager(private val context: Context, private val historyManager: 
             }
             latch.await()
             _incomingRequest.value = null
+
+            // Dismiss notification once handled
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notificationManager.cancel(1001)
 
             if (!allowed) {
                 val rejectObj = JSONObject().apply { put("type", "reject") }
@@ -705,6 +712,52 @@ class TransferManager(private val context: Context, private val historyManager: 
             ex.printStackTrace()
         }
         return ips
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "SmartShare Transfer Channel"
+            val descriptionText = "Notifications for file transfers"
+            val importance = android.app.NotificationManager.IMPORTANCE_DEFAULT
+            val channel = android.app.NotificationChannel("transfer_channel", name, importance).apply {
+                description = descriptionText
+            }
+            val notificationManager: android.app.NotificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun showIncomingNotification(filename: String, peerIp: String) {
+        val intent = android.content.Intent(context, com.aistudio.smartshare.abcd.MainActivity::class.java).apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            context, 0, intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = androidx.core.app.NotificationCompat.Builder(context, "transfer_channel")
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentTitle("Incoming File Request")
+            .setContentText("Device ($peerIp) wants to send $filename")
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+
+        val notificationManager = androidx.core.app.NotificationManagerCompat.from(context)
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationManager.notify(1001, builder.build())
+            }
+        } else {
+            notificationManager.notify(1001, builder.build())
+        }
     }
 
     fun onDestroy() {
