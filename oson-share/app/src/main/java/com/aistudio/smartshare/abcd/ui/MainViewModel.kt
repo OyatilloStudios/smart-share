@@ -1,9 +1,12 @@
 package com.aistudio.smartshare.abcd.ui
 
 import android.app.Application
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.smartshare.abcd.data.HistoryManager
+import com.aistudio.smartshare.abcd.data.SelectedFile
 import com.aistudio.smartshare.abcd.data.TransferHistoryItem
 import com.aistudio.smartshare.abcd.data.TransferManager
 import com.aistudio.smartshare.abcd.data.TransferStatus
@@ -14,7 +17,7 @@ import kotlinx.coroutines.launch
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val historyManager = HistoryManager(application)
-    private val transferManager = TransferManager(historyManager)
+    private val transferManager = TransferManager(application, historyManager)
 
     val deviceCode = transferManager.getDeviceCode()
     val deviceName = transferManager.getDeviceName()
@@ -22,8 +25,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _history = MutableStateFlow<List<TransferHistoryItem>>(emptyList())
     val history: StateFlow<List<TransferHistoryItem>> = _history.asStateFlow()
 
-    private val _selectedFiles = MutableStateFlow<List<String>>(emptyList())
-    val selectedFiles: StateFlow<List<String>> = _selectedFiles.asStateFlow()
+    private val _selectedFiles = MutableStateFlow<List<SelectedFile>>(emptyList())
+    val selectedFiles: StateFlow<List<SelectedFile>> = _selectedFiles.asStateFlow()
 
     private val _showHistory = MutableStateFlow(false)
     val showHistory: StateFlow<Boolean> = _showHistory.asStateFlow()
@@ -33,6 +36,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val speedMB = transferManager.speedMB
     val etaSeconds = transferManager.etaSeconds
     val activeFile = transferManager.activeFile
+    val incomingRequest = transferManager.incomingRequest
 
     init {
         loadHistory()
@@ -54,15 +58,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loadHistory()
     }
 
-    fun addSelectedFile(filePath: String) {
+    fun addSelectedFile(uriStr: String) {
+        val uri = Uri.parse(uriStr)
+        val (name, size) = getUriFileInfo(uri)
         val current = _selectedFiles.value.toMutableList()
-        current.add(filePath)
+        current.add(SelectedFile(uriStr, name, size))
         _selectedFiles.value = current
     }
 
-    fun removeSelectedFile(filePath: String) {
+    fun removeSelectedFile(file: SelectedFile) {
         val current = _selectedFiles.value.toMutableList()
-        current.remove(filePath)
+        current.remove(file)
         _selectedFiles.value = current
     }
     
@@ -70,10 +76,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedFiles.value = emptyList()
     }
 
+    fun setEncryptionPassword(password: String) {
+        transferManager.encryptionPassword = password
+    }
+
+    fun getEncryptionPassword(): String {
+        return transferManager.encryptionPassword
+    }
+
     fun startTransfer(code: String) {
-        if (code.length == 5 && _selectedFiles.value.isNotEmpty()) {
+        if (code.length >= 5 && _selectedFiles.value.isNotEmpty()) {
             viewModelScope.launch {
-                transferManager.startMockSender(code, _selectedFiles.value)
+                transferManager.startRealSender(code, _selectedFiles.value)
                 loadHistory()
             }
         }
@@ -89,5 +103,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     fun getCategoryFolder(filename: String): String {
         return historyManager.getCategoryFolder(filename)
+    }
+
+    private fun getUriFileInfo(uri: Uri): Pair<String, Long> {
+        var name = "unknown"
+        var size = 0L
+        try {
+            getApplication<Application>().contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (cursor.moveToFirst()) {
+                    if (nameIndex != -1) name = cursor.getString(nameIndex)
+                    if (sizeIndex != -1) size = cursor.getLong(sizeIndex)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        if (name == "unknown") {
+            name = uri.lastPathSegment ?: "unknown"
+        }
+        return Pair(name, size)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        transferManager.onDestroy()
     }
 }
