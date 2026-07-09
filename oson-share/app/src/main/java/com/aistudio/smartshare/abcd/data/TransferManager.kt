@@ -704,7 +704,10 @@ class TransferManager(private val context: Context, private val historyManager: 
                 val addresses = Collections.list(networkInterface.inetAddresses)
                 for (address in addresses) {
                     if (!address.isLoopbackAddress && address is Inet4Address) {
-                        ips.add(address.hostAddress)
+                        val hostAddress = address.hostAddress
+                        if (hostAddress != null) {
+                            ips.add(hostAddress)
+                        }
                     }
                 }
             }
