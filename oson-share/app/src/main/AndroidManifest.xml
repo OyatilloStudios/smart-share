@@ -16,7 +16,7 @@
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/app_icon"
         android:label="SmartShare"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
