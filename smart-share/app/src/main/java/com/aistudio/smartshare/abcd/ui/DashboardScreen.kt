@@ -26,8 +26,8 @@ import com.aistudio.smartshare.abcd.MainViewModel
 import com.aistudio.smartshare.abcd.utils.QrGenerator
 
 // Google Code Scanner kutubxonalari importlari
-import com.google.android.gms.code.scanner.GmsBarcodeScanning
-import com.google.android.gms.code.scanner.GmsBarcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -138,7 +138,7 @@ fun DashboardScreen(
                             try {
                                 val scanner = GmsBarcodeScanning.getClient(context)
                                 scanner.startScan()
-                                    .addOnSuccessListener { barcode: GmsBarcode ->
+                                    .addOnSuccessListener { barcode: Barcode ->
                                         val rawValue = barcode.rawValue ?: ""
                                         try {
                                             val json = org.json.JSONObject(rawValue)
